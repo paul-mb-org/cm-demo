@@ -4,6 +4,8 @@ on:
   push:
     branches:
       - main
+    paths:
+      - backend/src/services/orders/**
 
 permissions:
   id-token: write
