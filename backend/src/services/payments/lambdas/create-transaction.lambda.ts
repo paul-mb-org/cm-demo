@@ -11,6 +11,7 @@ const createTransactionHandler = async (
   event: APIGatewayProxyEvent,
 ) => {
   logger.info("Received request to create transaction", { input, event });
+  logger.info("jakie kupa");
   return {
     statusCode: 200,
     headers: { "Content-Type": "application/json" },
