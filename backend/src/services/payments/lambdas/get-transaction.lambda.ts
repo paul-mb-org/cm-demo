@@ -5,6 +5,8 @@ export const handler = async (
 ): Promise<APIGatewayProxyResult> => {
   const transactionId = event.pathParameters?.id;
 
+  console.log("SOME FUNNNY WORDS LOGGING ", transactionId);
+
   if (!transactionId) {
     return {
       statusCode: 400,
