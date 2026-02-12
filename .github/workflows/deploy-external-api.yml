@@ -21,9 +21,14 @@ jobs:
           node-version: 20
           cache: npm
 
-      - name: Install dependencies
+      - name: Install backend dependencies
         working-directory: backend
         run: npm ci
+
+      - name: Install lambda dependencies
+        run: |
+          npm ci --prefix backend/src/services/orders/lambdas
+          npm ci --prefix backend/src/services/payments/lambdas
 
       - name: Configure AWS credentials
         uses: aws-actions/configure-aws-credentials@v4
