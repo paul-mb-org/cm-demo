@@ -1,20 +1,38 @@
-name: Deploy PR Environment
+name: Deploy to Prod
 
 on:
-  pull_request:
-    types: [opened, synchronize, reopened, closed]
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: 'Release tag to deploy (e.g., v2026.02.12.1)'
+        required: true
+        type: string
 
 permissions:
   id-token: write
   contents: read
 
 jobs:
-  deploy:
-    name: Deploy PR Environment
-    if: github.event.action != 'closed'
+  validate:
+    name: Validate tag
+    runs-on: ubuntu-latest
+    steps:
+      - name: Validate tag format
+        run: |
+          TAG="${{ inputs.tag }}"
+          if [[ ! "${TAG}" =~ ^v[0-9]{4}\.[0-9]{2}\.[0-9]{2}\.[0-9]+$ ]]; then
+            echo "::error::Invalid tag format: ${TAG}. Expected: v2026.02.12.1"
+            exit 1
+          fi
+
+  deploy-external-api:
+    name: Deploy ExternalApi to prod
+    needs: validate
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
+        with:
+          ref: ${{ inputs.tag }}
 
       - uses: actions/setup-node@v4
         with:
@@ -36,16 +54,26 @@ jobs:
           role-to-assume: ${{ secrets.AWS_ROLE }}
           aws-region: ${{ secrets.AWS_REGION }}
 
-      - name: CDK Deploy
+      - name: CDK Deploy ExternalApi
         working-directory: backend
-        run: npx cdk deploy --all -c envSuffix=pr-${{ github.event.pull_request.number }} --require-approval never
+        run: npx cdk deploy ExternalApi -c env=prod --require-approval never
 
-  destroy:
-    name: Destroy PR Environment
-    if: github.event.action == 'closed'
+  approve-orders:
+    name: Approve OrdersApi deployment
+    needs: validate
+    runs-on: ubuntu-latest
+    environment: production
+    steps:
+      - run: echo "OrdersApi deployment approved for prod"
+
+  deploy-orders-api:
+    name: Deploy OrdersApi to prod
+    needs: approve-orders
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
+        with:
+          ref: ${{ inputs.tag }}
 
       - uses: actions/setup-node@v4
         with:
@@ -67,6 +95,6 @@ jobs:
           role-to-assume: ${{ secrets.AWS_ROLE }}
           aws-region: ${{ secrets.AWS_REGION }}
 
-      - name: CDK Destroy
+      - name: CDK Deploy OrdersApi
         working-directory: backend
-        run: npx cdk destroy --all -c envSuffix=pr-${{ github.event.pull_request.number }} --force
+        run: npx cdk deploy OrdersApi -c env=prod --require-approval never
