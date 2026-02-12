@@ -1,0 +1,35 @@
+{
+  "name": "backend",
+  "version": "0.1.0",
+  "bin": {
+    "backend": "bin/backend.js"
+  },
+  "scripts": {
+    "dev": "tsx src/local.ts",
+    "build": "tsc",
+    "watch": "tsc -w",
+    "test": "jest",
+    "cdk": "cdk"
+  },
+  "devDependencies": {
+    "@types/aws-lambda": "^8.10.160",
+    "@types/express": "^5.0.6",
+    "@types/jest": "^30",
+    "@types/js-yaml": "^4.0.9",
+    "@types/node": "^24.10.1",
+    "aws-cdk": "2.1105.0",
+    "express": "^5.2.1",
+    "jest": "^30",
+    "ts-jest": "^29",
+    "ts-node": "^10.9.2",
+    "tsx": "^4.21.0",
+    "typescript": "~5.9.3"
+  },
+  "dependencies": {
+    "aws-cdk-lib": "^2.237.1",
+    "constructs": "^10.0.0",
+    "js-yaml": "^4.1.0",
+    "zod": "^4.3.6",
+    "zod-to-json-schema": "^3.25.1"
+  }
+}

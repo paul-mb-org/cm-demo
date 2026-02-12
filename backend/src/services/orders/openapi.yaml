@@ -1,0 +1,122 @@
+openapi: "3.0.1"
+info:
+  title: "Orders API"
+  description: "Contract-first Orders API powered by SpecRestApi"
+  version: "1.0.0"
+
+x-amazon-apigateway-request-validators:
+  body-only:
+    validateRequestBody: true
+    validateRequestParameters: false
+  params-only:
+    validateRequestBody: false
+    validateRequestParameters: true
+
+x-amazon-apigateway-gateway-responses:
+  BAD_REQUEST_BODY:
+    statusCode: 400
+    responseTemplates:
+      application/json: '{"message": "$context.error.validationErrorString"}'
+
+paths:
+  /orders:
+    post:
+      summary: Create a new order
+      operationId: createOrder
+      x-amazon-apigateway-request-validator: body-only
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CreateOrderRequest"
+      responses:
+        "201":
+          description: Order created successfully
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/OrderResponse"
+        "400":
+          description: Invalid request
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+      x-amazon-apigateway-integration:
+        type: aws_proxy
+        httpMethod: POST
+        uri: ${CreateOrderLambdaArn}
+        passthroughBehavior: when_no_match
+
+  /orders/{id}:
+    get:
+      summary: Get an order by ID
+      operationId: getOrder
+      x-amazon-apigateway-request-validator: params-only
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          description: Order found
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/OrderResponse"
+        "400":
+          description: Missing order ID
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+      x-amazon-apigateway-integration:
+        type: aws_proxy
+        httpMethod: POST
+        uri: ${GetOrderLambdaArn}
+        passthroughBehavior: when_no_match
+
+components:
+  schemas:
+    CreateOrderRequest:
+      type: object
+      required:
+        - productId
+        - quantity
+      properties:
+        productId:
+          type: string
+          minLength: 1
+        quantity:
+          type: integer
+          minimum: 1
+        notes:
+          type: string
+      additionalProperties: false
+
+    OrderResponse:
+      type: object
+      properties:
+        id:
+          type: string
+        productId:
+          type: string
+        quantity:
+          type: integer
+        notes:
+          type: string
+          nullable: true
+        status:
+          type: string
+        createdAt:
+          type: string
+          format: date-time
+
+    ErrorResponse:
+      type: object
+      properties:
+        message:
+          type: string

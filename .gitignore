@@ -1,0 +1,6 @@
+.claude
+.idea
+.vscode
+node_modules
+.env*
+cdk.out
