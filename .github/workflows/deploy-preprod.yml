@@ -1,0 +1,122 @@
+name: Deploy to Pre-prod
+
+on:
+  push:
+    branches: [main]
+
+permissions:
+  id-token: write
+  contents: write
+
+jobs:
+  check-changes:
+    name: Check changed paths
+    runs-on: ubuntu-latest
+    outputs:
+      orders-changed: ${{ steps.filter.outputs.orders }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dorny/paths-filter@v3
+        id: filter
+        with:
+          filters: |
+            orders:
+              - 'backend/src/services/orders/**'
+
+  deploy-external-api:
+    name: Deploy ExternalApi to pre-prod
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+
+      - name: Install backend dependencies
+        working-directory: backend
+        run: npm ci
+
+      - name: Install lambda dependencies
+        run: |
+          npm ci --prefix backend/src/services/orders/lambdas
+          npm ci --prefix backend/src/services/payments/lambdas
+
+      - name: Configure AWS credentials
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: ${{ secrets.AWS_ROLE }}
+          aws-region: ${{ secrets.AWS_REGION }}
+
+      - name: CDK Deploy ExternalApi
+        working-directory: backend
+        run: npx cdk deploy ExternalApi-preprod -c env=preprod --require-approval never
+
+  approve-orders:
+    name: Approve OrdersApi deployment
+    needs: check-changes
+    if: needs.check-changes.outputs.orders-changed == 'true'
+    runs-on: ubuntu-latest
+    environment: preprod
+    steps:
+      - run: echo "OrdersApi deployment approved for pre-prod"
+
+  deploy-orders-api:
+    name: Deploy OrdersApi to pre-prod
+    needs: [check-changes, approve-orders]
+    if: needs.check-changes.outputs.orders-changed == 'true'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+
+      - name: Install backend dependencies
+        working-directory: backend
+        run: npm ci
+
+      - name: Install lambda dependencies
+        run: |
+          npm ci --prefix backend/src/services/orders/lambdas
+          npm ci --prefix backend/src/services/payments/lambdas
+
+      - name: Configure AWS credentials
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: ${{ secrets.AWS_ROLE }}
+          aws-region: ${{ secrets.AWS_REGION }}
+
+      - name: CDK Deploy OrdersApi
+        working-directory: backend
+        run: npx cdk deploy OrdersApi-preprod -c env=preprod --require-approval never
+
+  create-tag:
+    name: Create release tag
+    needs: [deploy-external-api, deploy-orders-api]
+    if: |
+      always() &&
+      needs.deploy-external-api.result == 'success' &&
+      (needs.deploy-orders-api.result == 'success' || needs.deploy-orders-api.result == 'skipped')
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Create and push tag
+        run: |
+          TODAY=$(date -u +%Y.%m.%d)
+          PREFIX="v${TODAY}"
+          LAST_SEQ=$(git tag --list "${PREFIX}.*" --sort=-version:refname | head -n 1 | grep -oE '[0-9]+$' || echo "0")
+          NEXT_SEQ=$((LAST_SEQ + 1))
+          TAG="${PREFIX}.${NEXT_SEQ}"
+          git tag "${TAG}"
+          git push origin "${TAG}"
+          echo "### Deployed to pre-prod :rocket:" >> "$GITHUB_STEP_SUMMARY"
+          echo "Tag: \`${TAG}\`" >> "$GITHUB_STEP_SUMMARY"
