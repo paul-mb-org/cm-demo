@@ -12,6 +12,7 @@ const createOrderHandler = async (
   event: APIGatewayProxyEvent,
 ) => {
   logger.info("Received request to create order", { input, event });
+  logger.info("Validating input data", { input });
   return {
     statusCode: 201,
     headers: { "Content-Type": "application/json" },
